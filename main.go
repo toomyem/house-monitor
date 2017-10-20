@@ -10,8 +10,10 @@ import (
 
 const port = 9000
 
-type temperature struct {
-	Reading float64
+type temperatureReading struct {
+	DeviceID  string  `json:"device_id"`
+	Timestamp int     `json:"ts"`
+	Reading   float64 `json:"reading"`
 }
 
 func temperatureHandler(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +28,7 @@ func temperatureHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Cannot read request body: %s", err)
 		return
 	}
-	var data temperature
+	var data temperatureReading
 	err = json.Unmarshal(body, &data)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
