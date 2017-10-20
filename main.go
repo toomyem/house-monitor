@@ -6,14 +6,36 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 const port = 9000
 
 type temperatureReading struct {
-	DeviceID  string  `json:"device_id"`
-	Timestamp int     `json:"ts"`
-	Reading   float64 `json:"reading"`
+	DeviceID  string `json:"device_id"`
+	Timestamp int    `json:"ts"`
+	Reading   string `json:"reading"`
+}
+
+func validateReading(data temperatureReading) error {
+	if data.DeviceID == "" {
+		return fmt.Errorf("'device_id' cannot be empty")
+	}
+
+	if data.Timestamp <= 0 {
+		return fmt.Errorf("'ts' cannot be <= 0")
+	}
+
+	if data.Reading == "" {
+		return fmt.Errorf("'reading' cannot be empty")
+	}
+
+	_, err := strconv.ParseFloat(data.Reading, 64)
+	if err != nil {
+		return fmt.Errorf("cannot parse 'reading' as float")
+	}
+
+	return nil
 }
 
 func temperatureHandler(w http.ResponseWriter, r *http.Request) {
@@ -31,8 +53,20 @@ func temperatureHandler(w http.ResponseWriter, r *http.Request) {
 	var data temperatureReading
 	err = json.Unmarshal(body, &data)
 	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(fmt.Sprintf("Cannot parse body: %s", err)))
+		return
+	}
+	err = validateReading(data)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(fmt.Sprintf("Invalid data: %s", err)))
+		return
+	}
+	err = storeInDb(data)
+	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Cannot parse body"))
+		log.Printf("Cannot store data in db: %s", err)
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
@@ -40,6 +74,11 @@ func temperatureHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// err := initializeDb()
+	// if err != nil {
+	// 	log.Fatalf("Cannot connect to db: %s", err)
+	// }
+
 	http.HandleFunc("/temperature", temperatureHandler)
 
 	log.Printf("App started on port %d\n", port)
